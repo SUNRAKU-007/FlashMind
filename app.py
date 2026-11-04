@@ -2,7 +2,10 @@ import re
 import time
 import streamlit as st
 
-from pipeline import build_search_agent, build_reader_agent, writer_chain, critic_chain
+from agent import build_search_agent, build_reader_agent, writer_chain, critic_chain
+
+# Same truncation as pipeline.py: how much of the search output is passed to the reader agent
+SEARCH_CHARS = 800
 
 # ───────────────────────────── page config ─────────────────────────────
 st.set_page_config(
@@ -263,20 +266,22 @@ if run_btn:
                 0,
                 lambda: run_agent(
                     build_search_agent(),
-                    f"Find recent, reliable and detailed information about: {topic}. "
-                    "Return titles, URLs and key snippets of the best sources.",
+                    f"Find recent, reliable and detailed information about: {topic}",
                 ),
             )
             data["reader"], data["reader_calls"] = stage(
                 1,
                 lambda: run_agent(
                     build_reader_agent(),
-                    f"Based on these search results about '{topic}', pick the single most relevant "
-                    "URL and scrape it for deeper content. Return the content with its URL.\n\n"
-                    f"Search results:\n{data['search'][:4000]}",
+                    f"Based on the following search results about '{topic}', "
+                    "pick the most relevant URL and scrape it for deeper content. \n\n"
+                    f"Search Results:\n{data['search'][:SEARCH_CHARS]}",
                 ),
             )
-            research = f"SEARCH RESULTS:\n{data['search']}\n\nSCRAPED CONTENT:\n{data['reader']}"
+            research = (
+                f"SEARCH RESULTS : \n {data['search']} \n\n"
+                f"DETAILED SCRAPED CONTENT : \n {data['reader']} \n\n"
+            )
             data["report"] = stage(2, lambda: writer_chain.invoke({"topic": topic, "research": research}))
             data["feedback"] = stage(3, lambda: critic_chain.invoke({"report": data["report"]}))
 
